@@ -3,9 +3,17 @@ import matplotlib.pyplot as plt
 from statsmodels.tsa.stattools import adfuller
 
 # Load data function
+# def load_data(file_path):
+#     df = pd.read_csv(file_path)
+#     df['Date'] = pd.to_datetime(df['Date'], format='%d-%b-%y')
+#     df = df.sort_values('Date')
+#     df.set_index('Date', inplace=True)
+#     return df
+
 def load_data(file_path):
     df = pd.read_csv(file_path)
-    df['Date'] = pd.to_datetime(df['Date'], format='%d-%b-%y')
+    df['Date'] = pd.to_datetime(df['Date'], infer_datetime_format=True, errors='coerce')
+    df.dropna(subset=['Date'], inplace=True)
     df = df.sort_values('Date')
     df.set_index('Date', inplace=True)
     return df
