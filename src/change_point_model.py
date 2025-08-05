@@ -2,6 +2,7 @@ import numpy as np
 import pymc3 as pm
 import arviz as az
 import matplotlib.pyplot as plt
+import pandas as pd
 
 def prepare_data(df, column='Price', sample_size=2000):
     """
@@ -17,23 +18,12 @@ def run_change_point_model(data):
     Returns the trace object.
     """
     with pm.Model() as model:
-        # Switch point prior
         tau = pm.DiscreteUniform('tau', lower=0, upper=len(data)-1)
-        
-        # Priors for means
         mu_1 = pm.Normal('mu_1', mu=np.mean(data), sigma=np.std(data))
         mu_2 = pm.Normal('mu_2', mu=np.mean(data), sigma=np.std(data))
-        
-        # Common sigma
         sigma = pm.HalfNormal('sigma', sigma=1)
-        
-        # Switch based on tau
         mu = pm.math.switch(tau >= np.arange(len(data)), mu_1, mu_2)
-        
-        # Likelihood
         likelihood = pm.Normal('likelihood', mu=mu, sigma=sigma, observed=data)
-        
-        # Sampling
         trace = pm.sample(2000, tune=1000, target_accept=0.95, return_inferencedata=True)
     return trace
 
@@ -64,3 +54,30 @@ def plot_change_point(data, date_index, change_point_date):
     plt.title('Bayesian Change Point Detection')
     plt.legend()
     plt.show()
+
+def calculate_impact(trace):
+    """
+    Calculate mean before and after the change point and the percentage difference.
+    """
+    mu_1_samples = trace.posterior['mu_1'].values.flatten()
+    mu_2_samples = trace.posterior['mu_2'].values.flatten()
+    
+    mu_1_mean = mu_1_samples.mean()
+    mu_2_mean = mu_2_samples.mean()
+    
+    impact_pct = ((mu_2_mean - mu_1_mean) / abs(mu_1_mean)) * 100
+    
+    return mu_1_mean, mu_2_mean, impact_pct
+
+def match_event(change_point_date, events_df, days_threshold=30):
+    """
+    Find the closest event to the detected change point within a given threshold (days).
+    """
+    events_df['Date'] = pd.to_datetime(events_df['Date'])
+    time_diff = abs(events_df['Date'] - change_point_date)
+    closest_event = events_df.loc[time_diff.idxmin()]
+    
+    if time_diff.min().days <= days_threshold:
+        return closest_event['Event'], closest_event['Date']
+    else:
+        return None, None
